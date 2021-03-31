@@ -1,0 +1,18 @@
+[package]
+name = "gmrs"
+version = "0.1.0"
+authors = ["diogo <diogo464@protonmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+gmrs_impl = { path = "./gmrs_impl" }
+thiserror = "1.0.24"
+
+[build-dependencies]
+cc = "1.0"
+
+[[example]]
+name = "hello_world"
+crate-type = ["cdylib"]
