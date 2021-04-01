@@ -5,15 +5,16 @@ fn validate_entry(item: ItemFn) -> Result<TokenStream> {
     if item.sig.inputs.len() != 1 {
         return Err(syn::Error::new_spanned(
             &item,
-            "Entry function must have 1 argument of type LuaStateRaw",
+            "Entry function must have 1 argument of type LuaState",
         ))?;
     }
     let name = &item.sig.ident;
     Ok(quote::quote! {
         #[no_mangle]
         pub extern "C" fn gmod13_open(raw: gmrs::lua::LuaStateRaw) -> u32 {
+            let state = unsafe { gmrs::lua::LuaState::new(raw) };
             #item
-            let _ = #name(raw);
+            let _ = #name(state);
             0
         }
     })

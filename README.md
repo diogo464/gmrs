@@ -19,17 +19,17 @@ If you get the error `Couldn't load module library!` while loading the module in
 use gmrs::prelude::*;
 
 #[gmrs::function]
-fn hello_world(state: LuaStateRaw) -> lua::Result<()> {
+fn hello_world(state: LuaState) -> lua::Result<()> {
     gmrs::print!(state, "Hello from rust");
     Ok(())
 }
 
 #[gmrs::entry]
-fn main(state: LuaStateRaw) {
+fn main(state: LuaState) {
     gmrs::set_global(state, "rust_hello_world", NativeFunc::new(hello_world));
 }
 
 #[gmrs::exit]
-fn exit(_state: LuaStateRaw) {}
+fn exit(_state: LuaState) {}
 
 ```

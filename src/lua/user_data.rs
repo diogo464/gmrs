@@ -1,4 +1,4 @@
-use super::{CFunc, FromStack, FromStackError, LuaStateRaw, NativeFunc, Result, ToStack};
+use super::{CFunc, FromStack, FromStackError, LuaState, LuaStateRaw, NativeFunc, Result, ToStack};
 use std::{
     any::TypeId,
     marker::PhantomData,
@@ -53,7 +53,7 @@ impl<T: UserType> Clone for UserData<T> {
 pub trait UserType: Sized + 'static {
     fn build_metatable(builder: &mut MetatableBuilder<Self>);
     /// Called when the user data is garbage collected, the `__gc` method.
-    fn lua_drop(&mut self, #[allow(unused)] state: LuaStateRaw) {}
+    fn lua_drop(&mut self, #[allow(unused)] state: LuaState) {}
 }
 
 #[derive(Debug)]
@@ -75,8 +75,8 @@ impl<T: UserType> MetatableBuilder<T> {
 }
 
 impl<T: UserType> ToStack for UserData<T> {
-    fn push(self, state: LuaStateRaw) -> i32 {
-        // It should be safe since we cant share LuaStateRaw across threads and its only ever
+    fn push(self, state: LuaState) -> i32 {
+        // It should be safe since we cant share LuaState across threads and its only ever
         // called from the same thread
         static mut METATABLE_REFERENCE: Option<i32> = None;
 
@@ -113,7 +113,7 @@ impl<T: UserType> ToStack for UserData<T> {
 }
 
 impl<T: UserType> FromStack for UserData<T> {
-    fn from_stack(state: LuaStateRaw, stack_pos: i32) -> Result<(Self, i32)> {
+    fn from_stack(state: LuaState, stack_pos: i32) -> Result<(Self, i32)> {
         let ud = unsafe {
             let ud = super::get_user_data(state, stack_pos) as *mut Self;
             if ud.is_null() || (*ud).ty != TypeId::of::<T>() {
@@ -126,6 +126,7 @@ impl<T: UserType> FromStack for UserData<T> {
 }
 
 unsafe extern "C" fn user_data_gc<T: UserType>(state: LuaStateRaw) -> i32 {
+    let state = LuaState::new(state);
     let ud = super::get_user_data(state, 1) as *mut UserData<T>;
     crate::print(state, "Calling user data gc");
     if !ud.is_null() {

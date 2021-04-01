@@ -1,4 +1,4 @@
-use super::{FromStack, LuaStateRaw, LuaType, Result, ToStack};
+use super::{FromStack, LuaState, LuaType, Result, ToStack};
 
 pub enum TableKey<'a> {
     String(&'a str),
@@ -20,7 +20,7 @@ impl<'a> From<u32> for TableKey<'a> {
     }
 }
 impl<'a> ToStack for TableKey<'a> {
-    fn push(self, state: LuaStateRaw) -> i32 {
+    fn push(self, state: LuaState) -> i32 {
         match self {
             Self::String(str) => super::push(state, str),
             Self::Integer(int) => super::push(state, int),
@@ -29,10 +29,10 @@ impl<'a> ToStack for TableKey<'a> {
 }
 
 pub trait FromTable: Sized {
-    fn from_table(state: LuaStateRaw, tbl: TableView) -> super::Result<Self>;
+    fn from_table(state: LuaState, tbl: TableView) -> super::Result<Self>;
 }
 impl<T: FromTable> FromStack for T {
-    fn from_stack(state: LuaStateRaw, stack_pos: i32) -> Result<(Self, i32)> {
+    fn from_stack(state: LuaState, stack_pos: i32) -> Result<(Self, i32)> {
         super::expect_type(state, stack_pos, LuaType::Table)?;
         let table_ref = TableView::new(state, stack_pos);
         Ok((T::from_table(state, table_ref)?, 1))
@@ -42,7 +42,7 @@ impl<T: FromTable> FromStack for T {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TableView(i32);
 impl TableView {
-    pub fn new(state: LuaStateRaw, stack_pos: i32) -> Self {
+    pub fn new(state: LuaState, stack_pos: i32) -> Self {
         Self(super::rel_to_abs(state, stack_pos))
     }
 
@@ -51,7 +51,7 @@ impl TableView {
     }
 
     /// Tries to get the value with `key`, fails if the conversion to `T` fails.
-    pub fn get<'a, T>(&self, state: LuaStateRaw, key: impl Into<TableKey<'a>>) -> Result<T>
+    pub fn get<'a, T>(&self, state: LuaState, key: impl Into<TableKey<'a>>) -> Result<T>
     where
         T: FromStack,
     {
@@ -60,7 +60,7 @@ impl TableView {
         super::get(state, -1)
     }
 
-    pub fn set<'a, T>(&self, state: LuaStateRaw, key: impl Into<TableKey<'a>>, value: T)
+    pub fn set<'a, T>(&self, state: LuaState, key: impl Into<TableKey<'a>>, value: T)
     where
         T: ToStack,
     {
@@ -69,24 +69,24 @@ impl TableView {
         super::set_table(state, self.stack_pos());
     }
 
-    pub fn unset<'a>(&self, state: LuaStateRaw, key: impl Into<TableKey<'a>>) {
+    pub fn unset<'a>(&self, state: LuaState, key: impl Into<TableKey<'a>>) {
         self.set(state, key, super::NIL)
     }
 
     /// Pushes the value with `key` on the stack.
-    pub fn push_value<'a>(&self, state: LuaStateRaw, key: impl Into<TableKey<'a>>) {
+    pub fn push_value<'a>(&self, state: LuaState, key: impl Into<TableKey<'a>>) {
         super::push(state, key.into());
         super::get_table(state, self.stack_pos());
     }
 }
 impl ToStack for TableView {
-    fn push(self, state: LuaStateRaw) -> i32 {
+    fn push(self, state: LuaState) -> i32 {
         super::push_copy(state, self.stack_pos());
         1
     }
 }
 impl FromStack for TableView {
-    fn from_stack(state: LuaStateRaw, stack_pos: i32) -> Result<(Self, i32)> {
+    fn from_stack(state: LuaState, stack_pos: i32) -> Result<(Self, i32)> {
         super::expect_type(state, stack_pos, LuaType::Table)?;
         Ok((Self::new(state, stack_pos), 1))
     }

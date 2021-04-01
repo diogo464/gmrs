@@ -23,10 +23,21 @@ pub const NIL: Nil = Nil;
 
 const LUA_GLOBALSINDEX: i32 = -10002;
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct LuaState(LuaStateRaw);
+impl LuaState {
+    pub unsafe fn new(raw: LuaStateRaw) -> Self {
+        Self(raw)
+    }
+    pub fn ptr(&self) -> LuaStateRaw {
+        self.0
+    }
+}
+
 #[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
 pub struct Nil;
 impl ToStack for Nil {
-    fn push(self, state: LuaStateRaw) -> i32 {
+    fn push(self, state: LuaState) -> i32 {
         push_nil(state);
         1
     }
@@ -40,7 +51,7 @@ impl NativeFunc {
     }
 }
 impl ToStack for NativeFunc {
-    fn push(self, state: LuaStateRaw) -> i32 {
+    fn push(self, state: LuaState) -> i32 {
         push_c_function(state, self.0);
         1
     }
@@ -113,17 +124,17 @@ impl LuaType {
 }
 
 /// Pops `count` values from the stack.
-pub fn pop(state: LuaStateRaw, count: u32) {
-    unsafe { bridge::gmod_bridge_pop(state, count as i32) }
+pub fn pop(state: LuaState, count: u32) {
+    unsafe { bridge::gmod_bridge_pop(state.ptr(), count as i32) }
 }
 
 /// Returns the number of elements on the stack.
-pub fn top(state: LuaStateRaw) -> i32 {
-    unsafe { bridge::gmod_bridge_top(state) }
+pub fn top(state: LuaState) -> i32 {
+    unsafe { bridge::gmod_bridge_top(state.ptr()) }
 }
 
 /// `Ok` if the value at `stack_pos` has type `ty`, `Err` otherwise.
-pub fn expect_type(state: LuaStateRaw, stack_pos: i32, ty: LuaType) -> Result<(), FromStackError> {
+pub fn expect_type(state: LuaState, stack_pos: i32, ty: LuaType) -> Result<(), FromStackError> {
     let actual = get_type(state, stack_pos);
     if actual != ty {
         Err(FromStackError::InvalidType {
@@ -138,7 +149,7 @@ pub fn expect_type(state: LuaStateRaw, stack_pos: i32, ty: LuaType) -> Result<()
 
 /// Converts a **relative** stack index to an **absolute** stack index.
 /// If the index is absolute it does nothing.
-pub fn rel_to_abs(state: LuaStateRaw, mut stack_pos: i32) -> i32 {
+pub fn rel_to_abs(state: LuaState, mut stack_pos: i32) -> i32 {
     if stack_pos < 0 {
         let size = top(state);
         stack_pos = size - (stack_pos * -1 - 1);
@@ -147,125 +158,125 @@ pub fn rel_to_abs(state: LuaStateRaw, mut stack_pos: i32) -> i32 {
 }
 
 /// Pushes `val` to the stack, returns the number of values pushed (usually just 1).
-pub fn push<T: ToStack>(state: LuaStateRaw, val: T) -> i32 {
+pub fn push<T: ToStack>(state: LuaState, val: T) -> i32 {
     T::push(val, state)
 }
 
 /// Pushes a copy of the value at `stack_pos` to the stack.
-pub fn push_copy(state: LuaStateRaw, stack_pos: i32) {
-    unsafe { bridge::gmod_bridge_push(state, stack_pos) }
+pub fn push_copy(state: LuaState, stack_pos: i32) {
+    unsafe { bridge::gmod_bridge_push(state.ptr(), stack_pos) }
 }
 
 /// Pushes `nil` to the stack.
-pub fn push_nil(state: LuaStateRaw) {
-    unsafe { bridge::gmod_bridge_push_nil(state) }
+pub fn push_nil(state: LuaState) {
+    unsafe { bridge::gmod_bridge_push_nil(state.ptr()) }
 }
 
 /// Pushes `string` to the stack.
-pub fn push_string(state: LuaStateRaw, string: &str) {
+pub fn push_string(state: LuaState, string: &str) {
     let string = std::ffi::CString::new(string).unwrap();
-    unsafe { bridge::gmod_bridge_push_string(state, string.as_ptr(), 0) }
+    unsafe { bridge::gmod_bridge_push_string(state.ptr(), string.as_ptr(), 0) }
 }
 
 /// Pushes `number` to the stack.
-pub fn push_number(state: LuaStateRaw, number: f64) {
-    unsafe { bridge::gmod_bridge_push_number(state, number) }
+pub fn push_number(state: LuaState, number: f64) {
+    unsafe { bridge::gmod_bridge_push_number(state.ptr(), number) }
 }
 
 /// Pushes `boolean` to the stack.
-pub fn push_bool(state: LuaStateRaw, boolean: bool) {
-    unsafe { bridge::gmod_bridge_push_bool(state, boolean) }
+pub fn push_bool(state: LuaState, boolean: bool) {
+    unsafe { bridge::gmod_bridge_push_bool(state.ptr(), boolean) }
 }
 
 /// Pushes `func` to the stack.
-pub fn push_c_function(state: LuaStateRaw, func: CFunc) {
-    unsafe { bridge::gmod_bridge_push_c_function(state, func) }
+pub fn push_c_function(state: LuaState, func: CFunc) {
+    unsafe { bridge::gmod_bridge_push_c_function(state.ptr(), func) }
 }
 
 /// Pushes a special value to the stack. check [LuaSpecial].
 ///
 /// ```
 /// use gmrs::prelude::*;
-/// fn set_global(state: LuaStateRaw) {
-///     lua::push_special(state, LuaSpecial::Glob);
-///     lua::push(state, "my value");
+/// fn set_global(state: LuaState) {
+///     lua::push_special(state.ptr(), LuaSpecial::Glob);
+///     lua::push(state.ptr(), "my value");
 ///     // the global table is now at -2.
-///     lua::set_field(state, -1, "my key");
+///     lua::set_field(state.ptr(), -1, "my key");
 /// }
 /// ```
-pub fn push_special(state: LuaStateRaw, special: LuaSpecial) {
+pub fn push_special(state: LuaState, special: LuaSpecial) {
     let special = match special {
         LuaSpecial::Glob => 0,
         LuaSpecial::Env => 1,
         LuaSpecial::Reg => 2,
     };
-    unsafe { bridge::gmod_bridge_push_special(state, special) }
+    unsafe { bridge::gmod_bridge_push_special(state.ptr(), special) }
 }
 
 /// Gets the value at `stack_pos`.
-pub fn get<T: FromStack>(state: LuaStateRaw, stack_pos: i32) -> Result<T> {
+pub fn get<T: FromStack>(state: LuaState, stack_pos: i32) -> Result<T> {
     <T as FromStack>::from_stack(state, stack_pos).map(|(v, _)| v)
 }
 
 /// Gets the string at `stack_pos`.
-pub fn get_string(state: LuaStateRaw, stack_pos: i32) -> Result<String, Utf8Error> {
+pub fn get_string(state: LuaState, stack_pos: i32) -> Result<String, Utf8Error> {
     let str_bytes = unsafe {
         let mut outlen = 0;
-        let ptr = bridge::gmod_bridge_get_string(state, stack_pos, &mut outlen) as *const u8;
+        let ptr = bridge::gmod_bridge_get_string(state.ptr(), stack_pos, &mut outlen) as *const u8;
         std::slice::from_raw_parts(ptr, outlen as usize)
     };
     Ok(std::str::from_utf8(str_bytes)?.to_string())
 }
 
 /// Gets the string at `stack_pos` without trying to convert to valid utf-8.
-pub fn get_string_bytes(state: LuaStateRaw, stack_pos: i32) -> Vec<u8> {
+pub fn get_string_bytes(state: LuaState, stack_pos: i32) -> Vec<u8> {
     unsafe {
         let mut outlen = 0;
-        let ptr = bridge::gmod_bridge_get_string(state, stack_pos, &mut outlen) as *const u8;
+        let ptr = bridge::gmod_bridge_get_string(state.ptr(), stack_pos, &mut outlen) as *const u8;
         std::slice::from_raw_parts(ptr, outlen as usize).to_owned()
     }
 }
 
 /// Gets the number at `stack_pos`.
-pub fn get_number(state: LuaStateRaw, stack_pos: i32) -> f64 {
-    unsafe { bridge::gmod_bridge_get_number(state, stack_pos) }
+pub fn get_number(state: LuaState, stack_pos: i32) -> f64 {
+    unsafe { bridge::gmod_bridge_get_number(state.ptr(), stack_pos) }
 }
 
 /// Gets the bool at `stack_pos`.
-pub fn get_bool(state: LuaStateRaw, stack_pos: i32) -> bool {
-    unsafe { bridge::gmod_bridge_get_bool(state, stack_pos) }
+pub fn get_bool(state: LuaState, stack_pos: i32) -> bool {
+    unsafe { bridge::gmod_bridge_get_bool(state.ptr(), stack_pos) }
 }
 
 /// Checks if the value at `stack_pos` has type `ty`.
-pub fn is_type(state: LuaStateRaw, stack_pos: i32, ty: LuaType) -> bool {
-    unsafe { bridge::gmod_bridge_is_type(state, stack_pos, ty.to_number()) }
+pub fn is_type(state: LuaState, stack_pos: i32, ty: LuaType) -> bool {
+    unsafe { bridge::gmod_bridge_is_type(state.ptr(), stack_pos, ty.to_number()) }
 }
 
 /// Returns the type of the value at `stack_pos`.
-pub fn get_type(state: LuaStateRaw, stack_pos: i32) -> LuaType {
-    unsafe { LuaType::from_number(bridge::gmod_bridge_get_type(state, stack_pos)) }
+pub fn get_type(state: LuaState, stack_pos: i32) -> LuaType {
+    unsafe { LuaType::from_number(bridge::gmod_bridge_get_type(state.ptr(), stack_pos)) }
 }
 
 /// Creates a reference of the value at the top of the stack and pops the value.
 /// Returns the reference. You have to remember to call `reference_free(reference)`.
-pub fn reference_create(state: LuaStateRaw) -> i32 {
-    unsafe { bridge::gmod_bridge_reference_create(state) }
+pub fn reference_create(state: LuaState) -> i32 {
+    unsafe { bridge::gmod_bridge_reference_create(state.ptr()) }
 }
 
 /// Frees the `reference`.
-pub fn reference_free(state: LuaStateRaw, reference: i32) {
-    unsafe { bridge::gmod_bridge_reference_free(state, reference) }
+pub fn reference_free(state: LuaState, reference: i32) {
+    unsafe { bridge::gmod_bridge_reference_free(state.ptr(), reference) }
 }
 
 /// Pushes the value pointed by `reference` to the stack.
-pub fn reference_push(state: LuaStateRaw, reference: i32) {
-    unsafe { bridge::gmod_bridge_reference_push(state, reference) }
+pub fn reference_push(state: LuaState, reference: i32) {
+    unsafe { bridge::gmod_bridge_reference_push(state.ptr(), reference) }
 }
 
 /// Pushes a new empty table to the stack.
 /// Returns a [TableView] to more easily manipulate the table.
-pub fn create_table(state: LuaStateRaw) -> TableView {
-    unsafe { bridge::gmod_bridge_create_table(state) };
+pub fn create_table(state: LuaState) -> TableView {
+    unsafe { bridge::gmod_bridge_create_table(state.ptr()) };
     TableView::new(state, top(state))
 }
 
@@ -273,33 +284,33 @@ pub fn create_table(state: LuaStateRaw) -> TableView {
 /// table = value at iStackPos.  
 /// key   = value at top of the stack.  
 /// Pops the key from the stack.  
-pub fn get_table(state: LuaStateRaw, stack_pos: i32) {
-    unsafe { bridge::gmod_bridge_get_table(state, stack_pos) }
+pub fn get_table(state: LuaState, stack_pos: i32) {
+    unsafe { bridge::gmod_bridge_get_table(state.ptr(), stack_pos) }
 }
 
 /// Sets table\[key\] to the value at the top of the stack.  
 /// table = value at iStackPos.  
 /// key   = value 2nd to the top of the stack.  
 /// Pops the key and the value from the stack.  
-pub fn set_table(state: LuaStateRaw, stack_pos: i32) {
-    unsafe { bridge::gmod_bridge_set_table(state, stack_pos) }
+pub fn set_table(state: LuaState, stack_pos: i32) {
+    unsafe { bridge::gmod_bridge_set_table(state.ptr(), stack_pos) }
 }
 
 /// Pushes table\[key\] on to the stack  
 /// table = value at iStackPos  
 /// key   = strName  
-pub fn get_field(state: LuaStateRaw, stack_pos: i32, name: &str) {
+pub fn get_field(state: LuaState, stack_pos: i32, name: &str) {
     let name = std::ffi::CString::new(name).unwrap();
-    unsafe { bridge::gmod_bridge_get_field(state, stack_pos, name.as_ptr()) }
+    unsafe { bridge::gmod_bridge_get_field(state.ptr(), stack_pos, name.as_ptr()) }
 }
 
 /// Sets table\[key\] to the value at the top of the stack.  
 /// table = value at iStackPos  
 /// key   = strName  
 /// Pops the value from the stack  
-pub fn set_field(state: LuaStateRaw, stack_pos: i32, name: &str) {
+pub fn set_field(state: LuaState, stack_pos: i32, name: &str) {
     let name = std::ffi::CString::new(name).unwrap();
-    unsafe { bridge::gmod_bridge_set_field(state, stack_pos, name.as_ptr()) }
+    unsafe { bridge::gmod_bridge_set_field(state.ptr(), stack_pos, name.as_ptr()) }
 }
 
 /// To call a function first push the push function to stack then push
@@ -310,15 +321,15 @@ pub fn set_field(state: LuaStateRaw, stack_pos: i32, name: &str) {
 ///
 /// This function is unsafe beacause if the function we are calling throws an error then
 /// this functions never returns and we risk leaking resources. check [pcall].
-pub unsafe fn call(state: LuaStateRaw, args: i32, results: i32) {
-    bridge::gmod_bridge_call(state, args, results)
+pub unsafe fn call(state: LuaState, args: i32, results: i32) {
+    bridge::gmod_bridge_call(state.ptr(), args, results)
 }
 
 #[must_use]
 /// Similar to [call] but `true` if the function succeded and `false` if it failed.
 /// If the function failed the error object will be at the top of the stack.
-pub fn pcall(state: LuaStateRaw, args: i32, results: i32) -> bool {
-    if unsafe { bridge::gmod_bridge_pcall(state, args, results, 0) } == 0 {
+pub fn pcall(state: LuaState, args: i32, results: i32) -> bool {
+    if unsafe { bridge::gmod_bridge_pcall(state.ptr(), args, results, 0) } == 0 {
         true
     } else {
         false
@@ -326,38 +337,38 @@ pub fn pcall(state: LuaStateRaw, args: i32, results: i32) -> bool {
 }
 
 /// Creates a new user data with size `size` and returns the pointer to the allocated memory.
-pub fn new_user_data(state: LuaStateRaw, size: u32) -> *mut std::ffi::c_void {
-    unsafe { bridge::gmod_bridge_new_user_data(state, size) }
+pub fn new_user_data(state: LuaState, size: u32) -> *mut std::ffi::c_void {
+    unsafe { bridge::gmod_bridge_new_user_data(state.ptr(), size) }
 }
 
 /// Returns the user data at `stack_pos`. If the value at `stack_pos` is not user data then it
 /// returns a null pointer.
-pub fn get_user_data(state: LuaStateRaw, stack_pos: i32) -> *mut std::ffi::c_void {
-    unsafe { bridge::gmod_bridge_get_user_data(state, stack_pos) }
+pub fn get_user_data(state: LuaState, stack_pos: i32) -> *mut std::ffi::c_void {
+    unsafe { bridge::gmod_bridge_get_user_data(state.ptr(), stack_pos) }
 }
 
 /// Sets the metatable for the value at `stack_pos`.
 /// The table itself should be at the top of the stack.
 /// This function will pop the metatable.
-pub fn set_metatable(state: LuaStateRaw, stack_pos: i32) {
-    unsafe { bridge::gmod_bridge_set_meta_table(state, stack_pos) }
+pub fn set_metatable(state: LuaState, stack_pos: i32) {
+    unsafe { bridge::gmod_bridge_set_meta_table(state.ptr(), stack_pos) }
 }
 
 #[must_use]
 /// Returns `true` if the value at `stack_pos` has a metatable and pushes it to the stack.
 /// Returns `false` if the value doesnt have a metatable and doesnt push anything to the stack.
-pub fn get_metatable(state: LuaStateRaw, stack_pos: i32) -> bool {
-    unsafe { bridge::gmod_bridge_get_meta_table(state, stack_pos) }
+pub fn get_metatable(state: LuaState, stack_pos: i32) -> bool {
+    unsafe { bridge::gmod_bridge_get_meta_table(state.ptr(), stack_pos) }
 }
 
 /// Throws an error message. This function will never return.
-pub unsafe fn throw_error(state: LuaStateRaw, error: String) -> ! {
+pub unsafe fn throw_error(state: LuaState, error: String) -> ! {
     let mut buffer = [0u8; 4096];
     let copy_len = (buffer.len() - 1).min(error.as_bytes().len());
     (&mut buffer[..copy_len]).copy_from_slice(&error.as_bytes()[..copy_len]);
     buffer[copy_len] = 0;
     drop(error);
-    bridge::gmod_bridge_throw_error(state, std::mem::transmute(buffer.as_ptr()));
+    bridge::gmod_bridge_throw_error(state.ptr(), std::mem::transmute(buffer.as_ptr()));
     unreachable!()
 }
 
@@ -373,28 +384,28 @@ pub fn upvalue_index(index: i32) -> i32 {
 ///
 ///```
 /// # use gmrs::prelude::*;
-/// # fn example_main(state: LuaStateRaw) {
+/// # fn example_main(state: LuaState) {
 /// # let some_tables_index = 0;
-/// lua::push(state, "myvalue1");
-/// lua::push_copy(state, some_tables_index);
-/// lua::push_c_closure(state, my_closure, 2);
+/// lua::push(state.ptr(), "myvalue1");
+/// lua::push_copy(state.ptr(), some_tables_index);
+/// lua::push_c_closure(state.ptr(), my_closure, 2);
 /// # }
 ///
 /// #[gmrs::function]
-/// fn my_closure(state: LuaStateRaw) -> lua::Result<()> {
+/// fn my_closure(state: LuaState) -> lua::Result<()> {
 /// let myvalue_index = lua::upvalue_index(1);
 /// let some_table_index = lua::upvalue_index(2);
 /// // lua::push_copy, lua::get, ...
 /// Ok(())
 ///}
 ///```
-pub fn push_c_closure(state: LuaStateRaw, func: CFunc, nargs: i32) {
-    unsafe { bridge::gmod_bridge_push_c_closure(state, func, nargs) }
+pub fn push_c_closure(state: LuaState, func: CFunc, nargs: i32) {
+    unsafe { bridge::gmod_bridge_push_c_closure(state.ptr(), func, nargs) }
 }
 
-pub struct Closure<R: ToStack + Send>(Box<dyn FnMut(LuaStateRaw) -> Result<R> + Send>);
+pub struct Closure<R: ToStack + Send>(Box<dyn FnMut(LuaState) -> Result<R> + Send>);
 impl<R: ToStack + Send> ToStack for Closure<R> {
-    fn push(self, state: LuaStateRaw) -> i32 {
+    fn push(self, state: LuaState) -> i32 {
         unsafe {
             let ud = new_user_data(state, std::mem::size_of::<Closure<R>>() as u32)
                 as *mut MaybeUninit<Closure<R>>;
@@ -412,16 +423,16 @@ impl<R: ToStack + Send> ToStack for Closure<R> {
 /// Creates a rust closure that can be pushed to the stack.
 pub fn closure<F, R>(func: F) -> Closure<R>
 where
-    F: FnMut(LuaStateRaw) -> Result<R> + Send + 'static,
+    F: FnMut(LuaState) -> Result<R> + Send + 'static,
     R: ToStack + Send,
 {
     Closure(Box::new(func))
 }
 
 /// Pushes a rust closure to the stack
-pub fn push_closure<R, F>(state: LuaStateRaw, func: F)
+pub fn push_closure<R, F>(state: LuaState, func: F)
 where
-    F: FnMut(LuaStateRaw) -> Result<R> + Send + 'static,
+    F: FnMut(LuaState) -> Result<R> + Send + 'static,
     R: ToStack + Send,
 {
     let closure = closure(func);
@@ -429,6 +440,7 @@ where
 }
 
 unsafe extern "C" fn closure_call<R: ToStack + Send>(state: LuaStateRaw) -> i32 {
+    let state = LuaState::new(state);
     let ud = get_user_data(state, upvalue_index(1)) as *mut Closure<R>;
     let result = (*ud).0(state);
     match result {
@@ -442,6 +454,7 @@ unsafe extern "C" fn closure_call<R: ToStack + Send>(state: LuaStateRaw) -> i32 
 }
 
 unsafe extern "C" fn closure_gc<R: ToStack + Send>(state: LuaStateRaw) -> i32 {
+    let state = LuaState::new(state);
     let ud = get_user_data(state, 1) as *mut Closure<R>;
     if !ud.is_null() {
         // why would it be null ? probably wont be
@@ -455,7 +468,7 @@ unsafe extern "C" fn closure_gc<R: ToStack + Send>(state: LuaStateRaw) -> i32 {
 ///```
 ///# use gmrs::prelude::*;
 /// #[gmrs::function]
-/// fn my_function(state: LuaStateRaw) -> lua::Result<()> {
+/// fn my_function(state: LuaState) -> lua::Result<()> {
 ///     # let some_condition = false;
 ///     if !some_condition {
 ///         // This error will be propagated up and eventually be thrown.

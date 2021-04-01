@@ -2,17 +2,17 @@ pub mod lua;
 
 pub use gmrs_impl::{entry, exit, function, raw_function};
 
-use lua::{LuaSpecial, LuaStateRaw, ToStack};
+use lua::{LuaSpecial, LuaState, ToStack};
 
 pub mod prelude {
     pub use super::lua::{
-        self, FromStack, FromTable, LuaSpecial, LuaStateRaw, MetatableBuilder, NativeFunc,
-        TableView, ToStack, UserData, UserType,
+        self, FromStack, FromTable, LuaSpecial, LuaState, LuaStateRaw, MetatableBuilder,
+        NativeFunc, TableView, ToStack, UserData, UserType,
     };
 }
 
 /// Prints the message using gmod's `print` function, the message should show up on the console.
-pub fn print(state: LuaStateRaw, message: &str) {
+pub fn print(state: LuaState, message: &str) {
     lua::push_special(state, LuaSpecial::Glob);
     lua::get_field(state, -1, "print");
     lua::push_string(state, message);
@@ -29,7 +29,7 @@ macro_rules! print {
 }
 
 /// Equivalent to `hook.Add(event, id, callback)`.
-pub fn hook_add<T: ToStack>(state: LuaStateRaw, event: &str, id: &str, val: T) {
+pub fn hook_add<T: ToStack>(state: LuaState, event: &str, id: &str, val: T) {
     lua::push_special(state, LuaSpecial::Glob);
     lua::get_field(state, -1, "hook");
     lua::get_field(state, -1, "Add");
@@ -41,7 +41,7 @@ pub fn hook_add<T: ToStack>(state: LuaStateRaw, event: &str, id: &str, val: T) {
 }
 
 /// Equivalent to `hook.Remove(event, id)`.
-pub fn hook_remove(state: LuaStateRaw, event: &str, id: &str) {
+pub fn hook_remove(state: LuaState, event: &str, id: &str) {
     lua::push_special(state, LuaSpecial::Glob);
     lua::get_field(state, -1, "hook");
     lua::get_field(state, -1, "Remove");
@@ -53,9 +53,9 @@ pub fn hook_remove(state: LuaStateRaw, event: &str, id: &str) {
 
 /// Runs hook with name `name` by calling `hook.Run`.  
 /// `func` should push the parameters to the stack.
-pub fn hook_run<F>(state: LuaStateRaw, name: &str, func: F)
+pub fn hook_run<F>(state: LuaState, name: &str, func: F)
 where
-    F: FnOnce(LuaStateRaw),
+    F: FnOnce(LuaState),
 {
     lua::push_special(state, LuaSpecial::Glob);
     lua::get_field(state, -1, "hook");
@@ -74,7 +74,7 @@ where
 }
 
 /// Sets a value on the global table.
-pub fn set_global<T: ToStack>(state: LuaStateRaw, key: &str, value: T) {
+pub fn set_global<T: ToStack>(state: LuaState, key: &str, value: T) {
     lua::push_special(state, LuaSpecial::Glob);
     lua::push(state, value);
     lua::set_field(state, -2, key);

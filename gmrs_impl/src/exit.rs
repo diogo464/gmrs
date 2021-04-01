@@ -5,7 +5,7 @@ fn validate_exit(item: ItemFn) -> Result<TokenStream> {
     if item.sig.inputs.len() != 1 {
         return Err(syn::Error::new_spanned(
             &item,
-            "Exit function must have 1 argument of type LuaStateRaw",
+            "Exit function must have 1 argument of type LuaState",
         ))?;
     }
     let name = &item.sig.ident;
@@ -13,7 +13,8 @@ fn validate_exit(item: ItemFn) -> Result<TokenStream> {
         #[no_mangle]
         pub extern "C" fn gmod13_close(raw: gmrs::lua::LuaStateRaw) -> u32 {
             #item
-            let _ = #name(raw);
+            let state = unsafe { gmrs::lua::LuaState::new(raw) };
+            let _ = #name(state);
             0
         }
     })

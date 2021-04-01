@@ -34,10 +34,11 @@ pub fn parse(
     let arg_name: Vec<_> = args.iter().map(|arg| &arg.pat).collect();
 
     (quote::quote! {
-        #vis unsafe extern "C" fn #name(state : gmrs::lua::LuaStateRaw) -> i32 {
+        #vis unsafe extern "C" fn #name(raw : gmrs::lua::LuaStateRaw) -> i32 {
             #item
             unsafe {
-                unsafe fn __inner_native_func_wrapper(state : gmrs::lua::LuaStateRaw) -> gmrs::lua::Result<i32> {
+                let state = gmrs::lua::LuaState::new(raw);
+                unsafe fn __inner_native_func_wrapper(state : gmrs::lua::LuaState) -> gmrs::lua::Result<i32> {
                     let mut stack_offset = 1;
                     #(
                         let (#arg_name, push_count) : (#arg_ty, i32) = <#arg_ty as gmrs::lua::FromStack>::from_stack(state, stack_offset)?;
