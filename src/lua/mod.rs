@@ -176,8 +176,14 @@ pub fn push_nil(state: LuaState) {
 
 /// Pushes `string` to the stack.
 pub fn push_string(state: LuaState, string: &str) {
-    let string = std::ffi::CString::new(string).unwrap();
-    unsafe { bridge::gmod_bridge_push_string(state.ptr(), string.as_ptr(), 0) }
+    push_bytes(state, string.as_bytes())
+}
+
+/// Pushes `string` to the stack containing the given bytes
+pub fn push_bytes(state: LuaState, data: &[u8]) {
+    unsafe {
+        bridge::gmod_bridge_push_string(state.ptr(), data.as_ptr() as *const i8, data.len() as u32)
+    }
 }
 
 /// Pushes `number` to the stack.

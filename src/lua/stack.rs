@@ -136,3 +136,10 @@ impl<T: ToStack> ToStack for Option<T> {
         }
     }
 }
+
+impl ToStack for &[u8] {
+    fn push(self, state: LuaState) -> i32 {
+        super::push_bytes(state, self);
+        1
+    }
+}
