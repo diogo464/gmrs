@@ -61,16 +61,23 @@ pub struct MetatableBuilder<T: UserType> {
     _phantom: PhantomData<T>,
     methods: Vec<(String, CFunc)>,
 }
+
 impl<T: UserType> MetatableBuilder<T> {
     pub fn new() -> Self {
-        Self {
-            _phantom: Default::default(),
-            methods: Default::default(),
-        }
+        Self::default()
     }
 
     pub fn method(&mut self, name: &str, func: CFunc) {
         self.methods.push((name.to_string(), func))
+    }
+}
+
+impl<T: UserType> Default for MetatableBuilder<T> {
+    fn default() -> Self {
+        Self {
+            _phantom: Default::default(),
+            methods: Default::default(),
+        }
     }
 }
 
@@ -117,7 +124,7 @@ impl<T: UserType> FromStack for UserData<T> {
         let ud = unsafe {
             let ud = super::get_user_data(state, stack_pos) as *mut Self;
             if ud.is_null() || (*ud).ty != TypeId::of::<T>() {
-                Err(FromStackError::InvalidUserdataType)?;
+                return Err(FromStackError::InvalidUserdataType.into());
             }
             Clone::clone(&*ud)
         };

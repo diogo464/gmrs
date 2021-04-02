@@ -10,13 +10,18 @@ pub fn parse(
     let name = &item.sig.ident;
 
     (quote::quote! {
-        #vis unsafe extern "C" fn #name(raw : gmrs::lua::LuaStateRaw) -> i32 {
-            let state = gmrs::lua::LuaState::new(raw);
+        #vis extern "C" fn #name(raw : gmrs::lua::LuaStateRaw) -> i32 {
+            unsafe { gmrs::internal::set_lua_state_raw(raw) };
+            let state = unsafe { gmrs::lua::LuaState::new(raw) };
             #item
-            match #name(state) {
+            let result = #name(state);
+            gmrs::internal::unset_lua_state_raw();
+            match result {
                 Ok(count) => count,
                 Err(e) => {
-                    unsafe { gmrs::lua::throw_error(state, format!("{}", e)) };
+                    let msg = format!("{}", e);
+                    drop(e);
+                    unsafe { gmrs::lua::throw_error(state, msg) };
                 }
             }
         }

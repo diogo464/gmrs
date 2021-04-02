@@ -26,6 +26,8 @@ const LUA_GLOBALSINDEX: i32 = -10002;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct LuaState(LuaStateRaw);
 impl LuaState {
+    /// # Safety
+    /// `raw` should be a valid [LuaStateRaw] which is given to us when we are called by lua
     pub unsafe fn new(raw: LuaStateRaw) -> Self {
         Self(raw)
     }
@@ -152,7 +154,7 @@ pub fn expect_type(state: LuaState, stack_pos: i32, ty: LuaType) -> Result<(), F
 pub fn rel_to_abs(state: LuaState, mut stack_pos: i32) -> i32 {
     if stack_pos < 0 {
         let size = top(state);
-        stack_pos = size - (stack_pos * -1 - 1);
+        stack_pos = size - (-stack_pos - 1);
     }
     stack_pos
 }
@@ -319,6 +321,7 @@ pub fn set_field(state: LuaState, stack_pos: i32, name: &str) {
 /// `args` is the number of arguments you pushed.
 /// `results` is the number of results that will be pushed to the stack after the function is called.
 ///
+/// # Safety
 /// This function is unsafe beacause if the function we are calling throws an error then
 /// this functions never returns and we risk leaking resources. check [pcall].
 pub unsafe fn call(state: LuaState, args: i32, results: i32) {
@@ -329,11 +332,7 @@ pub unsafe fn call(state: LuaState, args: i32, results: i32) {
 /// Similar to [call] but `true` if the function succeded and `false` if it failed.
 /// If the function failed the error object will be at the top of the stack.
 pub fn pcall(state: LuaState, args: i32, results: i32) -> bool {
-    if unsafe { bridge::gmod_bridge_pcall(state.ptr(), args, results, 0) } == 0 {
-        true
-    } else {
-        false
-    }
+    unsafe { bridge::gmod_bridge_pcall(state.ptr(), args, results, 0) == 0 }
 }
 
 /// Creates a new user data with size `size` and returns the pointer to the allocated memory.
@@ -361,14 +360,16 @@ pub fn get_metatable(state: LuaState, stack_pos: i32) -> bool {
     unsafe { bridge::gmod_bridge_get_meta_table(state.ptr(), stack_pos) }
 }
 
+/// # Safety
 /// Throws an error message. This function will never return.
+/// If you call this no destructors will be called and you risk leaking resources.
 pub unsafe fn throw_error(state: LuaState, error: String) -> ! {
     let mut buffer = [0u8; 4096];
     let copy_len = (buffer.len() - 1).min(error.as_bytes().len());
     (&mut buffer[..copy_len]).copy_from_slice(&error.as_bytes()[..copy_len]);
     buffer[copy_len] = 0;
     drop(error);
-    bridge::gmod_bridge_throw_error(state.ptr(), std::mem::transmute(buffer.as_ptr()));
+    bridge::gmod_bridge_throw_error(state.ptr(), buffer.as_ptr() as *const i8);
     unreachable!()
 }
 

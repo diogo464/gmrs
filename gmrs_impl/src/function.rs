@@ -35,9 +35,9 @@ pub fn parse(
 
     (quote::quote! {
         #vis unsafe extern "C" fn #name(raw : gmrs::lua::LuaStateRaw) -> i32 {
+            unsafe { gmrs::internal::set_lua_state_raw(raw) };
             #item
-            unsafe {
-                let state = gmrs::lua::LuaState::new(raw);
+                let state = unsafe { gmrs::lua::LuaState::new(raw) };
                 unsafe fn __inner_native_func_wrapper(state : gmrs::lua::LuaState) -> gmrs::lua::Result<i32> {
                     let mut stack_offset = 1;
                     #(
@@ -47,14 +47,16 @@ pub fn parse(
                     let result = #name(#(#arg_name),*)?;
                     Ok(gmrs::lua::push(state, result))
                 }
-                let result = __inner_native_func_wrapper(state);
+                let result = unsafe { __inner_native_func_wrapper(state) };
+                gmrs::internal::unset_lua_state_raw();
                 match result {
                     Ok(count) => count,
                     Err(e) => {
-                        gmrs::lua::throw_error(state, format!("{}", e));
+                        let msg = format!("{}", e);
+                        drop(e);
+                        unsafe { gmrs::lua::throw_error(state, msg) };
                     }
                 }
-            }
         }
     })
     .into()

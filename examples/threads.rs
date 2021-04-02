@@ -6,7 +6,7 @@ use gmrs::prelude::*;
 fn some_long_computation(state: LuaState) -> lua::Result<()> {
     // Create a reference to the first parameter, a success callback
     let success_callback = OwnedRef::new(state, 1);
-    // Create a reference to the seoncd parameter, a failure callback
+    // Create a reference to the second parameter, a failure callback
     let failure_callback = OwnedRef::new(state, 2);
 
     std::thread::spawn(move || {

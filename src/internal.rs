@@ -24,6 +24,8 @@ pub fn get_lua_state() -> Option<LuaState> {
     }
 }
 
+/// # Safety
+/// This function should only be called with a valid LuaStateRaw that is given to us when lua call's us.
 pub unsafe fn set_lua_state_raw(raw: LuaStateRaw) {
     CURRENT_LUA_STATE_RAW.with(|c| c.set(raw));
 }
@@ -33,9 +35,12 @@ pub fn unset_lua_state_raw() {
     unsafe { set_lua_state_raw(std::ptr::null_mut()) }
 }
 
-/// Should only be called once from the module open function
+/// # Safety
+/// Should only be called once from the module open function.
+/// It will add a hook that handles internal events.
+/// It is automatically called when using [gmrs::entry]
 pub unsafe fn install_hook(state: LuaState) {
-    let hook_name = internal_hook_name_from_time(CREATION_TIME.clone());
+    let hook_name = internal_hook_name_from_time(*CREATION_TIME);
     crate::hook_add(
         state,
         "Think",
@@ -48,9 +53,12 @@ pub unsafe fn install_hook(state: LuaState) {
     );
 }
 
+/// # Safety
 /// Should only be called once from the module close function
+/// It will add a hook that handles internal events.
+/// It is automatically called when using [gmrs::exit]
 pub unsafe fn uninstall_hook(state: LuaState) {
-    let hook_name = internal_hook_name_from_time(CREATION_TIME.clone());
+    let hook_name = internal_hook_name_from_time(*CREATION_TIME);
     crate::hook_remove(state, "Think", &hook_name);
 }
 
@@ -58,10 +66,13 @@ fn send_internal_message(msg: InternalMessage) {
     let _ = INTERNAL_CHANNELS.0.send(msg);
 }
 
+/// Queues a reference to be freed later.
 pub fn remote_reference_free(reference: i32) {
     send_internal_message(InternalMessage::ReferenceFree(reference));
 }
 
+/// Executes a function using the lua state.
+/// This function will block until the hook `Think` is called and we have access to the [LuaState].
 pub fn remote_execute<F, R>(func: F) -> R
 where
     R: Send + 'static,
