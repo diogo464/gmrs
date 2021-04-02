@@ -1,6 +1,13 @@
+#[macro_use]
+extern crate lazy_static;
+
+pub mod internal;
 pub mod lua;
+pub mod owned_ref;
 
 pub use gmrs_impl::{entry, exit, function, raw_function};
+pub use internal::{get_lua_state, remote_execute};
+pub use owned_ref::OwnedRef;
 
 use lua::{LuaSpecial, LuaState, ToStack};
 
@@ -9,6 +16,7 @@ pub mod prelude {
         self, FromStack, FromTable, LuaSpecial, LuaState, LuaStateRaw, MetatableBuilder,
         NativeFunc, TableView, ToStack, UserData, UserType,
     };
+    pub use super::OwnedRef;
 }
 
 /// Prints the message using gmod's `print` function, the message should show up on the console.
