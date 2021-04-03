@@ -22,3 +22,7 @@ crate-type = ["cdylib"]
 [[example]]
 name = "threads"
 crate-type = ["cdylib"]
+
+[[example]]
+name = "userdata"
+crate-type = ["cdylib"]

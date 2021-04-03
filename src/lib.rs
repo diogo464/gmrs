@@ -6,7 +6,7 @@ pub mod lua;
 pub mod refs;
 
 pub use gmrs_impl::{entry, exit, function, raw_function};
-pub use internal::{get_lua_state, remote_execute};
+pub use internal::{get_lua_state, remote_execute, remote_try_execute};
 pub use refs::{ArcRef, AtomicRef, OwnedRef};
 
 use lua::{LuaSpecial, LuaState, ToStack};
@@ -16,7 +16,6 @@ pub mod prelude {
         self, FromStack, FromTable, LuaSpecial, LuaState, LuaStateRaw, MetatableBuilder,
         NativeFunc, TableView, ToStack, UserData, UserType,
     };
-    pub use super::OwnedRef;
     pub use super::{ArcRef, AtomicRef, OwnedRef};
 }
 
@@ -79,7 +78,7 @@ where
         "Dont pop values in the function that is supposed to push values"
     );
     let status = lua::pcall(state, arg_count, 0);
-    assert!(status, "Calling hook.Run cant fail");
+    assert!(status, "Calling hook.Run cant fail"); // right ?
 }
 
 /// Sets a value on the global table.

@@ -52,8 +52,6 @@ impl<T: UserType> Clone for UserData<T> {
 
 pub trait UserType: Sized + 'static {
     fn build_metatable(builder: &mut MetatableBuilder<Self>);
-    /// Called when the user data is garbage collected, the `__gc` method.
-    fn lua_drop(&mut self, #[allow(unused)] state: LuaState) {}
 }
 
 #[derive(Debug)]
@@ -137,9 +135,6 @@ unsafe extern "C" fn user_data_gc<T: UserType>(state: LuaStateRaw) -> i32 {
     let ud = super::get_user_data(state, 1) as *mut UserData<T>;
     crate::print(state, "Calling user data gc");
     if !ud.is_null() {
-        let mut this = (*ud).lock();
-        T::lua_drop(&mut this, state);
-        drop(this);
         std::ptr::drop_in_place(ud);
     }
     0

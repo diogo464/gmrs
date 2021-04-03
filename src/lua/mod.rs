@@ -341,6 +341,46 @@ pub fn pcall(state: LuaState, args: i32, results: i32) -> bool {
     unsafe { bridge::gmod_bridge_pcall(state.ptr(), args, results, 0) == 0 }
 }
 
+#[must_use]
+/// Similar to [pcall] but instead of pushing the arguments should be all pushed in the `args` function parameter.
+/// The funcion to be called should be on the top of the stack prior to calling this function.
+/// This function wraps [pcall] and counts the number of arguments pushed.
+pub fn pcall_with<F>(state: LuaState, results: i32, args: F) -> bool
+where
+    F: FnOnce(LuaState),
+{
+    let size_before_args = top(state);
+    args(state);
+    let size_after_args = top(state);
+    let arg_count = size_after_args - size_before_args;
+    pcall(state, arg_count, results)
+}
+
+/// Similar to [pcall] but if the function fails nothing is pushed to the stack and instead an error
+/// is returned. If the function succeds then Ok is returned and the results are pushed to the stack.
+pub fn pcall_result(state: LuaState, args: i32, results: i32) -> Result<()> {
+    match pcall(state, args, results) {
+        true => Ok(()),
+        false => {
+            let err_msg = get_string_bytes(state, -1);
+            pop(state, 1);
+            Err(Error::CustomBytes(err_msg))
+        }
+    }
+}
+
+/// [pcall_with] + [pcall_result] => pcall_result_with
+pub fn pcall_result_with<F>(state: LuaState, results: i32, args: F) -> Result<()>
+where
+    F: FnOnce(LuaState),
+{
+    let size_before_args = top(state);
+    args(state);
+    let size_after_args = top(state);
+    let arg_count = size_after_args - size_before_args;
+    pcall_result(state, arg_count, results)
+}
+
 /// Creates a new user data with size `size` and returns the pointer to the allocated memory.
 pub fn new_user_data(state: LuaState, size: u32) -> *mut std::ffi::c_void {
     unsafe { bridge::gmod_bridge_new_user_data(state.ptr(), size) }

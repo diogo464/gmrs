@@ -13,6 +13,7 @@ lazy_static! {
 enum InternalMessage {
     ReferenceFree(i32),
     RemoteExecute(Box<dyn FnOnce(LuaState) + Send>),
+    RemoteTryExecute(Box<dyn FnOnce(LuaState) -> lua::Result<()> + Send>),
 }
 
 pub fn get_lua_state() -> Option<LuaState> {
@@ -47,8 +48,7 @@ pub unsafe fn install_hook(state: LuaState) {
         &hook_name,
         crate::lua::closure(|state| {
             let receiver = INTERNAL_CHANNELS.1.clone();
-            internal_think_loop(state, receiver);
-            Ok(())
+            internal_think_loop(state, receiver)
         }),
     );
 }
@@ -89,15 +89,34 @@ where
     rx.recv().unwrap()
 }
 
+pub fn remote_try_execute<F, R>(func: F) -> R
+where
+    R: Send + 'static,
+    F: FnOnce(LuaState) -> lua::Result<R> + Send + 'static,
+{
+    let (tx, rx) = channel::bounded(0);
+    let msg = InternalMessage::RemoteTryExecute(Box::new(move |state| {
+        let result = func(state)?;
+        // this should never fail
+        tx.send(result).unwrap();
+        Ok(())
+    }));
+    send_internal_message(msg);
+    // this should never fail either
+    rx.recv().unwrap()
+}
+
 fn internal_hook_name_from_time(time: Instant) -> String {
     format!("gmrs_internal_hook_{:?}", time)
 }
 
-fn internal_think_loop(state: LuaState, receiver: Receiver<InternalMessage>) {
+fn internal_think_loop(state: LuaState, receiver: Receiver<InternalMessage>) -> lua::Result<()> {
     while let Ok(msg) = receiver.try_recv() {
         match msg {
             InternalMessage::ReferenceFree(reference) => lua::reference_free(state, reference),
             InternalMessage::RemoteExecute(func) => func(state),
+            InternalMessage::RemoteTryExecute(func) => func(state)?,
         }
     }
+    Ok(())
 }
