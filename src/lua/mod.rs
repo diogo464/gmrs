@@ -201,6 +201,16 @@ pub fn push_c_function(state: LuaState, func: CFunc) {
     unsafe { bridge::gmod_bridge_push_c_function(state.ptr(), func) }
 }
 
+/// Pushes `vector` to the stack.
+pub fn push_vector(state: LuaState, vector: [f32; 3]) {
+    unsafe { bridge::gmod_bridge_push_vector(state.ptr(), vector[0], vector[1], vector[2]) }
+}
+
+/// Pushes 'angle' to the stack. Angle\[pitch, yaw, roll\]
+pub fn push_angle(state: LuaState, angle: [f32; 3]) {
+    unsafe { bridge::gmod_bridge_push_angle(state.ptr(), angle[0], angle[1], angle[2]) }
+}
+
 /// Pushes a special value to the stack. check [LuaSpecial].
 ///
 /// ```
@@ -253,6 +263,22 @@ pub fn get_number(state: LuaState, stack_pos: i32) -> f64 {
 /// Gets the bool at `stack_pos`.
 pub fn get_bool(state: LuaState, stack_pos: i32) -> bool {
     unsafe { bridge::gmod_bridge_get_bool(state.ptr(), stack_pos) }
+}
+
+/// Returns the vector at `stack_pos`.
+/// If the value at `stack_pos` is not a vector then it returns [0, 0, 0].
+pub fn get_vector(state: LuaState, stack_pos: i32) -> [f32; 3] {
+    let mut vector = [0.0; 3];
+    unsafe { bridge::gmod_bridge_get_vector(state.ptr(), stack_pos, vector.as_mut_ptr()) }
+    vector
+}
+
+/// Returns the angle at `stack_pos`.
+/// If the value at `stack_pos` is not a angle then it returns [0, 0, 0].
+pub fn get_angle(state: LuaState, stack_pos: i32) -> [f32; 3] {
+    let mut angle = [0.0; 3];
+    unsafe { bridge::gmod_bridge_get_angle(state.ptr(), stack_pos, angle.as_mut_ptr()) }
+    angle
 }
 
 /// Checks if the value at `stack_pos` has type `ty`.

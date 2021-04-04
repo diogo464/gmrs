@@ -45,12 +45,16 @@ extern "C" {
     pub fn gmod_bridge_get_number(state: LuaStateRaw, stack_pos: i32) -> f64;
     pub fn gmod_bridge_get_bool(state: LuaStateRaw, stack_pos: i32) -> bool;
     pub fn gmod_bridge_get_c_function(state: LuaStateRaw, stack_pos: i32) -> CFunc;
+    pub fn gmod_bridge_get_vector(state: LuaStateRaw, stack_pos: i32, vector: *mut f32);
+    pub fn gmod_bridge_get_angle(state: LuaStateRaw, stack_pos: i32, angle: *mut f32);
     pub fn gmod_bridge_push_nil(state: LuaStateRaw);
     pub fn gmod_bridge_push_string(state: LuaStateRaw, val: *const std::os::raw::c_char, len: u32);
     pub fn gmod_bridge_push_number(state: LuaStateRaw, val: f64);
     pub fn gmod_bridge_push_bool(state: LuaStateRaw, val: bool);
     pub fn gmod_bridge_push_c_function(state: LuaStateRaw, val: CFunc);
     pub fn gmod_bridge_push_c_closure(state: LuaStateRaw, val: CFunc, vars: i32);
+    pub fn gmod_bridge_push_vector(state: LuaStateRaw, x: f32, y: f32, z: f32);
+    pub fn gmod_bridge_push_angle(state: LuaStateRaw, pitch: f32, yaw: f32, roll: f32);
 
     pub fn gmod_bridge_reference_create(state: LuaStateRaw) -> i32;
     pub fn gmod_bridge_reference_free(state: LuaStateRaw, reference: i32);

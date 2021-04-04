@@ -120,6 +120,20 @@ extern "C"
     {
         return LUA->GetCFunction(stack_pos);
     }
+    void gmod_bridge_get_vector(lua_State* state, int stack_pos, float* vector)
+    {
+        const auto vec = LUA->GetVector(stack_pos);
+        vector[0]      = vec.x;
+        vector[1]      = vec.y;
+        vector[2]      = vec.z;
+    }
+    void gmod_bridge_get_angle(lua_State* state, int stack_pos, float* angle)
+    {
+        const auto ang = LUA->GetAngle(stack_pos);
+        angle[0]       = ang.x;
+        angle[1]       = ang.y;
+        angle[2]       = ang.z;
+    }
 
     void gmod_bridge_push_nil(lua_State* state)
     {
@@ -145,6 +159,23 @@ extern "C"
     {
         return LUA->PushCClosure(val, vars);
     }
+    void gmod_bridge_push_vector(lua_State* state, float x, float y, float z)
+    {
+        auto vec = Vector();
+        vec.x    = x;
+        vec.y    = y;
+        vec.z    = z;
+        return LUA->PushVector(vec);
+    }
+    void gmod_bridge_push_angle(lua_State* state, float p, float y, float r)
+    {
+        auto ang = Vector();
+        ang.x    = p;
+        ang.y    = y;
+        ang.z    = r;
+        return LUA->PushAngle(ang);
+    }
+
     int gmod_bridge_reference_create(lua_State* state)
     {
         return LUA->ReferenceCreate();
